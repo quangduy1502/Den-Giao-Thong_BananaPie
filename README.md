@@ -1,6 +1,6 @@
 # BTL CO3009 – Hệ thống đèn giao thông 2 tuyến
 
-**Môn:** CO3009 – Nhập môn Hệ thống nhúng  
+**Môn:** CO3009 – Vi xử lý – Vi điều khiển
 **Nhóm:** <!-- điền số nhóm -->  
 **Thành viên:**
 | Tên | MSSV | Vai trò |
@@ -24,7 +24,7 @@ Hiển thị chế độ, thời gian, nhiệt độ và độ ẩm lên màn h�
 ---
 
 ## Cấu trúc thư mục
-
+Các file và thư mục bên dưới sẽ được bổ sung trong quá trình thực hiện.
 ```
 BTL-CO3009-Den-Giao-Thong/
 ├── Core/
@@ -57,6 +57,7 @@ BTL-CO3009-Den-Giao-Thong/
 ---
 
 ## Hướng dẫn build và nạp
+> Hướng dẫn dự kiến; sẽ cập nhật và kiểm tra lại sau khi tạo project STM32CubeIDE.
 
 ### Yêu cầu
 - **STM32CubeIDE** (phiên bản 1.13 trở lên)
@@ -92,14 +93,13 @@ BTL-CO3009-Den-Giao-Thong/
 | 22/11 | fsm_tuning | TV3 |
 | **22/11** | **Nạp lần đầu vào mạch (hạn chung)** | **Cả nhóm** |
 | 3/12 | Báo cáo + README + tag v1.0-final | Cả nhóm |
-| **8/12** | **Nộp chính thức** | — |
 
 ---
 
 ## Quy ước code
 
 - **Tên file:** chữ thường, gạch dưới → `fsm_automatic.c`
-- **Tên hàm:** `<module>_<hành_động>` → `button_read()`, `scheduler_init()`
+- **Tên hàm:** đặt rõ chức năng, ví dụ `button_read()`; scheduler dùng các hàm theo đề như `SCH_Init()`, `SCH_Add_Task()`
 - **HAL** chỉ nằm trong module phần cứng và `main.c`; các file `fsm_*.c` **không gọi HAL**
 - **Không dùng** `HAL_Delay` trong chương trình chính
 - Mỗi người làm nhánh `feature/tên-mình`, gộp vào `dev`, cuối cùng vào `main`
