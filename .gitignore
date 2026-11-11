@@ -1,0 +1,37 @@
+# STM32CubeIDE
+/.metadata
+/Debug/
+/Release/
+*.su
+*.cyclo
+*.d
+*.o
+
+# STM32CubeMX
+*.bak
+
+# Build output
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+
+# Eclipse/CDT
+.project
+.cproject
+.settings/
+
+# VS Code
+.vscode/
+
+# Windows
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+
+# Log files
+*.log
