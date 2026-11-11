@@ -1,26 +1,21 @@
-# STM32CubeIDE
-/.metadata
-/Debug/
-/Release/
+# STM32CubeIDE workspace
+.metadata/
+
+# Build output
+Debug/
+Release/
 *.su
 *.cyclo
 *.d
 *.o
-
-# STM32CubeMX
-*.bak
-
-# Build output
 *.elf
 *.bin
 *.hex
 *.map
 *.lst
 
-# Eclipse/CDT
-.project
-.cproject
-.settings/
+# STM32CubeMX
+*.bak
 
 # VS Code
 .vscode/
