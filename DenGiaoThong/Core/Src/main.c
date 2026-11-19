@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include "scheduler.h"
 #include "software_timer.h"
+#include "lcd.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,7 +49,7 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+static LCD_HandleTypeDef lcd = {0};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -111,6 +112,27 @@ int main(void)
   MX_I2C1_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+  if (lcd_init(&lcd, &hi2c1) != HAL_OK) {
+    Error_Handler();
+  }
+
+  /* Dong 1 */
+  if (lcd_set_cursor(&lcd, 0, 0) != HAL_OK) {
+      Error_Handler();
+  }
+
+  if (lcd_print(&lcd, "Den giao thong") != HAL_OK) {
+      Error_Handler();
+  }
+
+  /* Dong 2 */
+  if (lcd_set_cursor(&lcd, 0, 1) != HAL_OK) {
+      Error_Handler();
+  }
+
+  if (lcd_print(&lcd, "LCD OK - 0x21") != HAL_OK) {
+      Error_Handler();
+  }
   HAL_TIM_Base_Start_IT(&htim2);
   SCH_Init();
   SCH_Add_Task(timer_run, 0, 1);        // Task cập nhật software timer mỗi 10ms
