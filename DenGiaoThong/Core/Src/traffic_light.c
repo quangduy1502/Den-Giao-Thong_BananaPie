@@ -15,13 +15,11 @@ static const traffic_pins_t traffic_pins[2] = {
 };
 
 // mức chân A, B cho từng màu (thứ tự: đỏ, xanh, vàng, tắt)
-// tạm giả định: 00 = tắt, 01 = xanh, 10 = đỏ, 11 = vàng
-// sau này sửa lại theo kết quả thử trên mạch
 static const uint8_t traffic_combo[4][2] = {
     // A, B
-    { 1, 0 },   // đỏ
-    { 0, 1 },   // xanh
-    { 1, 1 },   // vàng
+    { 1, 1 },   // đỏ
+    { 1, 0 },   // xanh
+    { 0, 1 },   // vàng
     { 0, 0 },   // tắt
 };
 
