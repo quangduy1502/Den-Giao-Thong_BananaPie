@@ -24,6 +24,10 @@
 /* USER CODE BEGIN Includes */
 #include "scheduler.h"
 #include "software_timer.h"
+#include "button.h"
+#include "traffic_light.h"
+#include "fsm_automatic.h"
+#include "fsm_manual.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -111,11 +115,15 @@ int main(void)
   MX_I2C1_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+  button_init();
+  traffic_init();
   HAL_TIM_Base_Start_IT(&htim2);
   SCH_Init();
-  SCH_Add_Task(timer_run, 0, 1);        // Task cập nhật software timer mỗi 10ms
-  SCH_Add_Task(task_led_pa5, 0, 50);    // Nháy LED PA5 mỗi 500ms
-  SCH_Add_Task(task_one_shot, 300, 0);  // One-shot task chạy 1 lần duy nhất sau 3s
+  SCH_Add_Task(timer_run, 0, 1);          // Cập nhật software timer mỗi 10ms
+  SCH_Add_Task(button_read, 0, 1);        // Quét nút bấm mỗi 10ms
+  SCH_Add_Task(fsm_automatic_run, 0, 1);  // FSM chế độ tự động mỗi 10ms
+  SCH_Add_Task(fsm_manual_run, 0, 1);     // FSM chế độ bằng tay & chuyển chế độ mỗi 10ms
+  SCH_Add_Task(task_led_pa5, 0, 50);      // Nháy LED PA5 mỗi 500ms (heartbeat)
   /* USER CODE END 2 */
 
   /* Infinite loop */
