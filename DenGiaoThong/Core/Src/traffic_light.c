@@ -14,7 +14,6 @@ static const traffic_pins_t traffic_pins[2] = {
     { TL2_A_GPIO_Port, TL2_A_Pin, TL2_B_GPIO_Port, TL2_B_Pin },
 };
 
-// mức chân A, B cho từng màu (thứ tự: đỏ, xanh, vàng, tắt)
 static const uint8_t traffic_combo[4][2] = {
     // A, B
     { 1, 1 },   // đỏ
@@ -23,9 +22,7 @@ static const uint8_t traffic_combo[4][2] = {
     { 0, 0 },   // tắt
 };
 
-// đặt màu cho một tuyến
 void traffic_set(uint8_t line, traffic_color_t color) {
-    // tuyến hoặc màu sai thì bỏ qua
     if (line < 1 || line > NUM_LINES || line > 2) return;
     if ((uint8_t)color > TL_OFF) return;
 
@@ -36,7 +33,6 @@ void traffic_set(uint8_t line, traffic_color_t color) {
                       traffic_combo[color][1] ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
-// tắt đèn của tất cả các tuyến
 void traffic_init(void) {
     for (uint8_t line = 1; line <= NUM_LINES; line++) {
         traffic_set(line, TL_OFF);
