@@ -9,6 +9,13 @@ void setTimer(uint8_t index, uint32_t duration_ms) {
     timer_flag[index] = (timer_counter[index] == 0) ? 1 : 0;
 }
 
+uint32_t timer_remaining_ms(uint8_t index) {
+    if (index >= MAX_TIMERS) {
+        return 0;
+    }
+    return timer_counter[index] * TIMER_TICK_MS;
+}
+
 void timer_run(void) {
     for (uint8_t i = 0; i < MAX_TIMERS; i++) {
         if (timer_counter[i] > 0) {

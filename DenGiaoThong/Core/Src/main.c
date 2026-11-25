@@ -28,6 +28,8 @@
 #include "traffic_light.h"
 #include "fsm_automatic.h"
 #include "fsm_manual.h"
+#include "fsm_tuning.h"
+#include "lcd_screen.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -37,6 +39,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define DHT20_SAMPLE_PERIOD_MS 1000U
+#define LCD_FORMAT_PERIOD_MS    100U
+#define LCD_CHARS_PER_UPDATE      4U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -52,6 +57,8 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+static DHT20_HandleTypeDef dht;
+static LCD_HandleTypeDef lcd;
 
 /* USER CODE END PV */
 
@@ -67,6 +74,58 @@ static void MX_TIM2_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+static void task_dht20(void) {
+    static uint32_t last_request_attempt;
+
+    if (dht.pending != 0U) {
+        if (dht20_read_data(&dht) == HAL_OK) {
+            (void)dht20_convert(&dht);
+        }
+        return;
+    }
+
+    uint32_t now = HAL_GetTick();
+    if (now - last_request_attempt >= DHT20_SAMPLE_PERIOD_MS) {
+        last_request_attempt = now;
+        (void)dht20_request_data(&dht);
+    }
+}
+
+static void task_lcd_update(void) {
+    static char wanted[LCD_ROWS][LCD_COLS + 1U];
+    static char displayed[LCD_ROWS][LCD_COLS];
+    static uint32_t last_format;
+
+    uint32_t now = HAL_GetTick();
+    if (wanted[0][0] == '\0' || now - last_format >= LCD_FORMAT_PERIOD_MS) {
+        lcd_screen_format(wanted, &dht);
+        last_format = now;
+    }
+
+    /* Send at most one short run per tick to keep the other tasks responsive. */
+    for (uint8_t row = 0; row < LCD_ROWS; ++row) {
+        uint8_t col = 0;
+        while (col < LCD_COLS && wanted[row][col] == displayed[row][col]) {
+            ++col;
+        }
+        if (col == LCD_COLS) {
+            continue;
+        }
+        if (lcd_set_cursor(&lcd, col, row) != HAL_OK) {
+            return;
+        }
+        for (uint8_t count = 0; count < LCD_CHARS_PER_UPDATE && col < LCD_COLS;
+             ++count, ++col) {
+            if (wanted[row][col] == displayed[row][col] ||
+                lcd_write_char(&lcd, wanted[row][col]) != HAL_OK) {
+                break;
+            }
+            displayed[row][col] = wanted[row][col];
+        }
+        return;
+    }
+}
+
 void task_led_pa5(void) {
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
 }
@@ -117,13 +176,23 @@ int main(void)
   /* USER CODE BEGIN 2 */
   button_init();
   traffic_init();
-  HAL_TIM_Base_Start_IT(&htim2);
+  HAL_StatusTypeDef dht_status = dht20_init(&dht, &hi2c1);
+  HAL_StatusTypeDef lcd_status = lcd_init(&lcd, &hi2c1);
+
   SCH_Init();
   SCH_Add_Task(timer_run, 0, 1);          // Cập nhật software timer mỗi 10ms
   SCH_Add_Task(button_read, 0, 1);        // Quét nút bấm mỗi 10ms
   SCH_Add_Task(fsm_automatic_run, 0, 1);  // FSM chế độ tự động mỗi 10ms
   SCH_Add_Task(fsm_manual_run, 0, 1);     // FSM chế độ bằng tay & chuyển chế độ mỗi 10ms
+  SCH_Add_Task(fsm_tuning_run, 0, 1);     // FSM chỉnh thời gian mỗi 10ms
   SCH_Add_Task(task_led_pa5, 0, 50);      // Nháy LED PA5 mỗi 500ms (heartbeat)
+  if (dht_status == HAL_OK) {
+    SCH_Add_Task(task_dht20, 0, 1);
+  }
+  if (lcd_status == HAL_OK) {
+    SCH_Add_Task(task_lcd_update, 0, 1);
+  }
+  HAL_TIM_Base_Start_IT(&htim2);
   /* USER CODE END 2 */
 
   /* Infinite loop */

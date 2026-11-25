@@ -9,6 +9,7 @@
 extern uint8_t timer_flag[MAX_TIMERS];
 
 void setTimer(uint8_t index, uint32_t duration_ms);
+uint32_t timer_remaining_ms(uint8_t index);
 void timer_run(void);
 
 #endif /* INC_SOFTWARE_TIMER_H_ */
