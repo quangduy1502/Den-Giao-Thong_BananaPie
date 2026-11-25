@@ -24,7 +24,7 @@ static const uint8_t traffic_combo[4][2] = {
 
 void traffic_set(uint8_t line, traffic_color_t color) {
     if (line < 1 || line > NUM_LINES || line > 2) return;
-    if ((uint8_t)color > TL_OFF) return;
+    if ((unsigned int)color > TL_OFF) return;
 
     const traffic_pins_t *p = &traffic_pins[line - 1];
     HAL_GPIO_WritePin(p->port_a, p->pin_a,

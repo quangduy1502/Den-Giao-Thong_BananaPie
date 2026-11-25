@@ -1,8 +1,17 @@
 #include "scheduler.h"
 
+typedef struct {
+    void (*pTask)(void);
+    uint32_t Delay;
+    uint32_t Period;
+    uint32_t TaskID;
+} sTask;
+
 static sTask SCH_tasks_G[SCH_MAX_TASKS];
 static uint8_t SCH_count = 0;
 static uint32_t next_task_id = 1;
+static volatile uint32_t tick_count;
+static uint32_t last_schedule_tick;
 
 static uint32_t Get_New_Task_ID(void) {
     uint32_t id = next_task_id++;
@@ -12,23 +21,32 @@ static uint32_t Get_New_Task_ID(void) {
 
 void SCH_Init(void) {
     SCH_count = 0;
-    for (uint8_t i = 0; i < SCH_MAX_TASKS; i++) {
-        SCH_tasks_G[i].pTask = 0;
-        SCH_tasks_G[i].Delay = 0;
-        SCH_tasks_G[i].Period = 0;
-        SCH_tasks_G[i].RunMe = 0;
-        SCH_tasks_G[i].TaskID = NO_TASK_ID;
-    }
+    tick_count = 0;
+    last_schedule_tick = 0;
 }
 
-/* Bắt buộc O(1): chỉ xử lý task đầu danh sách */
 void SCH_Update(void) {
-    if (SCH_count == 0) return;
-    if (SCH_tasks_G[0].Delay > 0) {
-        SCH_tasks_G[0].Delay--;
-    }
-    if (SCH_tasks_G[0].Delay == 0) {
-        SCH_tasks_G[0].RunMe = 1;
+    /* TIM2 only records ticks. The foreground owns the task queue. */
+    tick_count++;
+}
+
+uint32_t SCH_Get_Tick(void) {
+    return tick_count;
+}
+
+static void SCH_Apply_Elapsed_Ticks(void) {
+    uint32_t now = SCH_Get_Tick();
+    uint32_t elapsed = now - last_schedule_tick;
+    last_schedule_tick = now;
+
+    /* Spend the elapsed ticks across the queue, leaving due tasks at zero. */
+    for (uint8_t i = 0; i < SCH_count && elapsed > 0; i++) {
+        if (elapsed < SCH_tasks_G[i].Delay) {
+            SCH_tasks_G[i].Delay -= elapsed;
+            break;
+        }
+        elapsed -= SCH_tasks_G[i].Delay;
+        SCH_tasks_G[i].Delay = 0;
     }
 }
 
@@ -57,7 +75,6 @@ static uint32_t SCH_Insert_Task(void (*pFunction)(void), uint32_t DELAY, uint32_
     SCH_tasks_G[pos].pTask = pFunction;
     SCH_tasks_G[pos].Delay = rem_delay;
     SCH_tasks_G[pos].Period = PERIOD;
-    SCH_tasks_G[pos].RunMe = (pos == 0 && rem_delay == 0) ? 1 : 0;
     SCH_tasks_G[pos].TaskID = assignedID;
 
     SCH_count++;
@@ -65,18 +82,11 @@ static uint32_t SCH_Insert_Task(void (*pFunction)(void), uint32_t DELAY, uint32_
 }
 
 uint32_t SCH_Add_Task(void (*pFunction)(void), uint32_t DELAY, uint32_t PERIOD) {
+    SCH_Apply_Elapsed_Ticks();
     return SCH_Insert_Task(pFunction, DELAY, PERIOD, NO_TASK_ID);
 }
 
-uint8_t SCH_Delete_Task(uint32_t taskID) {
-    if (SCH_count == 0 || taskID == NO_TASK_ID) return 0;
-
-    uint8_t pos = 0;
-    while (pos < SCH_count && SCH_tasks_G[pos].TaskID != taskID) {
-        pos++;
-    }
-    if (pos == SCH_count) return 0;
-
+static void SCH_Remove_Task(uint8_t pos) {
     if (pos + 1 < SCH_count) {
         SCH_tasks_G[pos + 1].Delay += SCH_tasks_G[pos].Delay;
     }
@@ -86,32 +96,36 @@ uint8_t SCH_Delete_Task(uint32_t taskID) {
     }
 
     SCH_count--;
-    SCH_tasks_G[SCH_count].pTask = 0;
-    SCH_tasks_G[SCH_count].TaskID = NO_TASK_ID;
+}
+
+uint8_t SCH_Delete_Task(uint32_t taskID) {
+    if (SCH_count == 0 || taskID == NO_TASK_ID) return 0;
+
+    SCH_Apply_Elapsed_Ticks();
+    uint8_t pos = 0;
+    while (pos < SCH_count && SCH_tasks_G[pos].TaskID != taskID) {
+        pos++;
+    }
+    if (pos == SCH_count) return 0;
+
+    SCH_Remove_Task(pos);
     return 1;
 }
 
 void SCH_Dispatch_Tasks(void) {
-    while (SCH_count > 0 && SCH_tasks_G[0].RunMe > 0) {
+    SCH_Apply_Elapsed_Ticks();
+    while (SCH_count > 0 && SCH_tasks_G[0].Delay == 0) {
         sTask currentTask = SCH_tasks_G[0];
-
-        for (uint8_t i = 0; i < SCH_count - 1; i++) {
-            SCH_tasks_G[i] = SCH_tasks_G[i + 1];
-        }
-        SCH_count--;
-        SCH_tasks_G[SCH_count].pTask = 0;
-        SCH_tasks_G[SCH_count].TaskID = NO_TASK_ID;
-
-        if (SCH_count > 0 && SCH_tasks_G[0].Delay == 0) {
-            SCH_tasks_G[0].RunMe = 1;
-        }
-
-        if (currentTask.pTask != 0) {
-            (*currentTask.pTask)();
-        }
+        uint32_t started = last_schedule_tick;
+        SCH_Remove_Task(0);
+        currentTask.pTask();
+        SCH_Apply_Elapsed_Ticks();
 
         if (currentTask.Period > 0) {
-            SCH_Insert_Task(currentTask.pTask, currentTask.Period, currentTask.Period, currentTask.TaskID);
+            /* Resume at the next period after an overrun. */
+            uint32_t elapsed = last_schedule_tick - started;
+            uint32_t delay = currentTask.Period - (elapsed % currentTask.Period);
+            SCH_Insert_Task(currentTask.pTask, delay, currentTask.Period, currentTask.TaskID);
         }
     }
 }

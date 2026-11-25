@@ -18,6 +18,14 @@ static bool auto_check_change_mode(void) {
     return false;
 }
 
+static void auto_start_phase(system_status_t phase, uint8_t active_line,
+                             traffic_color_t color, uint32_t duration_ms) {
+    traffic_set(active_line == 1 ? 2 : 1, TL_RED);
+    traffic_set(active_line, color);
+    setTimer(TIMER_AUTO, duration_ms);
+    status = phase;
+}
+
 // chạy mỗi 10 ms
 void fsm_automatic_run(void) {
     switch (status) {
@@ -25,49 +33,30 @@ void fsm_automatic_run(void) {
     case AUTO_INIT:
         mode = MODE_AUTO;
         (void)isButtonPressed(BUTTON_CHANGE_MODE);  // xóa lần nhấn cũ
-        traffic_set(1, TL_RED);
-        traffic_set(2, TL_GREEN);
-        setTimer(TIMER_AUTO, time_green);
-        status = AUTO_RED1_GREEN2;
+        auto_start_phase(AUTO_RED1_GREEN2, 2, TL_GREEN, time_green);
         break;
 
     case AUTO_RED1_GREEN2:
-        traffic_set(1, TL_RED);
-        traffic_set(2, TL_GREEN);
-        if (auto_check_change_mode()) break;
-        if (timer_flag[TIMER_AUTO]) {               // hết giờ xanh
-            status = AUTO_RED1_AMBER2;
-            setTimer(TIMER_AUTO, time_amber);
+        if (!auto_check_change_mode() && timer_flag[TIMER_AUTO]) {
+            auto_start_phase(AUTO_RED1_AMBER2, 2, TL_AMBER, time_amber);
         }
         break;
 
     case AUTO_RED1_AMBER2:
-        traffic_set(1, TL_RED);
-        traffic_set(2, TL_AMBER);
-        if (auto_check_change_mode()) break;
-        if (timer_flag[TIMER_AUTO]) {               // hết giờ vàng
-            status = AUTO_GREEN1_RED2;
-            setTimer(TIMER_AUTO, time_green);
+        if (!auto_check_change_mode() && timer_flag[TIMER_AUTO]) {
+            auto_start_phase(AUTO_GREEN1_RED2, 1, TL_GREEN, time_green);
         }
         break;
 
     case AUTO_GREEN1_RED2:
-        traffic_set(1, TL_GREEN);
-        traffic_set(2, TL_RED);
-        if (auto_check_change_mode()) break;
-        if (timer_flag[TIMER_AUTO]) {               // hết giờ xanh
-            status = AUTO_AMBER1_RED2;
-            setTimer(TIMER_AUTO, time_amber);
+        if (!auto_check_change_mode() && timer_flag[TIMER_AUTO]) {
+            auto_start_phase(AUTO_AMBER1_RED2, 1, TL_AMBER, time_amber);
         }
         break;
 
     case AUTO_AMBER1_RED2:
-        traffic_set(1, TL_AMBER);
-        traffic_set(2, TL_RED);
-        if (auto_check_change_mode()) break;
-        if (timer_flag[TIMER_AUTO]) {               // hết giờ vàng
-            status = AUTO_RED1_GREEN2;
-            setTimer(TIMER_AUTO, time_green);
+        if (!auto_check_change_mode() && timer_flag[TIMER_AUTO]) {
+            auto_start_phase(AUTO_RED1_GREEN2, 2, TL_GREEN, time_green);
         }
         break;
 

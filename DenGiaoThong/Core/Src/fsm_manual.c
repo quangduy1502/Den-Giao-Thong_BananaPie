@@ -19,6 +19,12 @@ static bool manual_check_change_mode(void) {
     return false;
 }
 
+static void manual_select_green(uint8_t active_line) {
+    traffic_set(active_line == 1 ? 2 : 1, TL_RED);
+    traffic_set(active_line, TL_GREEN);
+    status = active_line == 1 ? MAN_GREEN1_RED2 : MAN_RED1_GREEN2;
+}
+
 // chạy mỗi 10 ms: xử lý chế độ bằng tay và bước chuyển chế độ SWITCH_ALL_RED
 void fsm_manual_run(void) {
     static bool all_red_started = false;
@@ -29,26 +35,18 @@ void fsm_manual_run(void) {
         mode = MODE_MANUAL;
         (void)isButtonPressed(BUTTON_CHANGE_MODE);  // xóa lần nhấn cũ
         (void)isButtonPressed(BUTTON_TOGGLE_LINE);
-        traffic_set(1, TL_GREEN);
-        traffic_set(2, TL_RED);
-        status = MAN_GREEN1_RED2;
+        manual_select_green(1);
         break;
 
     case MAN_GREEN1_RED2:
-        traffic_set(1, TL_GREEN);
-        traffic_set(2, TL_RED);
-        if (manual_check_change_mode()) break;
-        if (isButtonPressed(BUTTON_TOGGLE_LINE)) {
-            status = MAN_RED1_GREEN2;
+        if (!manual_check_change_mode() && isButtonPressed(BUTTON_TOGGLE_LINE)) {
+            manual_select_green(2);
         }
         break;
 
     case MAN_RED1_GREEN2:
-        traffic_set(1, TL_RED);
-        traffic_set(2, TL_GREEN);
-        if (manual_check_change_mode()) break;
-        if (isButtonPressed(BUTTON_TOGGLE_LINE)) {
-            status = MAN_GREEN1_RED2;
+        if (!manual_check_change_mode() && isButtonPressed(BUTTON_TOGGLE_LINE)) {
+            manual_select_green(1);
         }
         break;
 
