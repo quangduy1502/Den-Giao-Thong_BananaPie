@@ -7,6 +7,7 @@
 
 #include "fsm_tuning.h"
 #include "global.h"
+#include "software_timer.h"
 #include "button.h"
 #include "traffic_light.h"
 #include <stdbool.h>
@@ -17,8 +18,35 @@
 #define BTN_CONFIRM		3
 
 #define TUNE_STEP 		1000
+#define TUNE_BLINK_MS 	250
 
-static void tune_show_color(traffic_color_t color){
+static bool blink_on = true;
+
+static void tune_reset_blink(void) {
+	blink_on = true;
+	setTimer(TIMER_TUNING, TUNE_BLINK_MS);
+}
+
+static void tune_show_color(traffic_color_t color) {
+	if (color == TL_GREEN) {
+		// Nháy xanh 2Hz lệch pha (tắt tuyến kia trước khi bật tuyến này)
+		// để không bao giờ có 2 tuyến cùng xanh tại bất kỳ thời điểm nào
+		if (blink_on) {
+			traffic_set(2, TL_OFF);
+			traffic_set(1, TL_GREEN);
+		} else {
+			traffic_set(1, TL_OFF);
+			traffic_set(2, TL_GREEN);
+		}
+		return;
+	}
+
+	if (!blink_on) {
+		traffic_set(1, TL_OFF);
+		traffic_set(2, TL_OFF);
+		return;
+	}
+
 	traffic_set(1, color);
 	traffic_set(2, color);
 }
@@ -34,13 +62,14 @@ static void tune_load(void) {
 
 static void tune_next_param(void) {
 	switch(status) {
-	case TUNE_RED: status = TUNE_GREEN; 	break;
+	case TUNE_RED:   status = TUNE_GREEN; 	break;
 	case TUNE_GREEN: status = TUNE_AMBER; 	break;
 	case TUNE_AMBER: status = TUNE_RED; 	break;
 	default: break;
 	}
 
 	tune_load();
+	tune_reset_blink();
 }
 
 static void tune_increase(void) {
@@ -102,16 +131,12 @@ void fsm_tuning_run(void) {
 		}
 		status = TUNE_RED;
 		tune_load();
+		tune_reset_blink();
 		break;
 
-	 case TUNE_RED:
+	case TUNE_RED:
 	case TUNE_GREEN:
 	case TUNE_AMBER:
-		// cả hai tuyến sáng màu đang chỉnh
-		if (status == TUNE_RED)        tune_show_color(TL_RED);
-		else if (status == TUNE_GREEN) tune_show_color(TL_GREEN);
-		else                           tune_show_color(TL_AMBER);
-
 		if (tune_check_exit()) break; // nút thoát kiểm tra trước
 
 		if (isButtonPressed(BTN_SELECT)) {
@@ -124,6 +149,15 @@ void fsm_tuning_run(void) {
 			(void)tune_confirm(); // sai thì không lưu
 			tune_load(); // nạp lại giá trị đã lưu (hoặc giá trị cũ)
 		}
+
+		if (timer_flag[TIMER_TUNING]) {
+			blink_on = !blink_on;
+			setTimer(TIMER_TUNING, TUNE_BLINK_MS);
+		}
+
+		if (status == TUNE_RED)        tune_show_color(TL_RED);
+		else if (status == TUNE_GREEN) tune_show_color(TL_GREEN);
+		else                           tune_show_color(TL_AMBER);
 		break;
 
 	default:

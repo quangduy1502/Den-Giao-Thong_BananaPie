@@ -39,9 +39,11 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define DHT20_SAMPLE_PERIOD_MS 1000U
-#define LCD_FORMAT_PERIOD_MS    100U
-#define LCD_CHARS_PER_UPDATE      4U
+#define DHT20_SAMPLE_TICKS     100U
+#define DHT20_READ_DELAY_TICKS   9U
+#define DHT20_RETRY_TICKS        2U
+#define LCD_FORMAT_PERIOD_MS   100U
+#define LCD_CHARS_PER_UPDATE     4U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -74,20 +76,22 @@ static void MX_TIM2_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static void task_dht20(void) {
-    static uint32_t last_request_attempt;
-
-    if (dht.pending != 0U) {
-        if (dht20_read_data(&dht) == HAL_OK) {
-            (void)dht20_convert(&dht);
-        }
-        return;
+static void task_dht20_read_oneshot(void) {
+    HAL_StatusTypeDef st = dht20_read_data(&dht);
+    if (st == HAL_OK) {
+        (void)dht20_convert(&dht);
+    } else if (st == HAL_BUSY && dht.pending != 0U) {
+        /* Cảm biến chưa đo xong, hẹn one-shot đọc lại sau 20ms */
+        (void)SCH_Add_Task(task_dht20_read_oneshot, DHT20_RETRY_TICKS, 0);
     }
+}
 
-    uint32_t now = HAL_GetTick();
-    if (now - last_request_attempt >= DHT20_SAMPLE_PERIOD_MS) {
-        last_request_attempt = now;
-        (void)dht20_request_data(&dht);
+static void task_dht20_request(void) {
+    if (dht.pending == 0U) {
+        if (dht20_request_data(&dht) == HAL_OK) {
+            /* Task one-shot (Period = 0): đọc kết quả sau 90ms rồi tự xóa */
+            (void)SCH_Add_Task(task_dht20_read_oneshot, DHT20_READ_DELAY_TICKS, 0);
+        }
     }
 }
 
@@ -128,11 +132,6 @@ static void task_lcd_update(void) {
 
 void task_led_pa5(void) {
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-}
-
-void task_one_shot(void) {
-    /* Kiểm tra software timer & one-shot: bật sáng đèn 1 hoặc đổi trạng thái sau 3s */
-    HAL_GPIO_WritePin(TL1_A_GPIO_Port, TL1_A_Pin, GPIO_PIN_SET);
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
@@ -189,7 +188,7 @@ int main(void)
   SCH_Add_Task(fsm_tuning_run, 0, 1);     // FSM chỉnh thời gian mỗi 10ms
   SCH_Add_Task(task_led_pa5, 0, 50);      // Nháy LED PA5 mỗi 500ms (heartbeat)
   if (dht_status == HAL_OK) {
-    SCH_Add_Task(task_dht20, 0, 1);
+    SCH_Add_Task(task_dht20_request, 0, DHT20_SAMPLE_TICKS); // Đọc DHT20 mỗi 1s
   }
   if (lcd_status == HAL_OK) {
     SCH_Add_Task(task_lcd_update, 0, 1);
